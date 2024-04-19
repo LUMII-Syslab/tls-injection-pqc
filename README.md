@@ -10,7 +10,7 @@ First, clone the BC TLS-IM into some subdirectory of your project (e.g., into `s
 
 Add the following BC directories as source sets, e.g., (for Gradle):
 
-```
+```java
 sourceSets.main {
     java {
         srcDirs 'src/main/java',
@@ -30,7 +30,7 @@ sourceSets.main {
 
 Second, clone this repository, e.g., into `src/tls-injection-pqc`. Then add the following directory to srcDirs:
 
-```
+```java
                 'src/tls-injection-pqc/src/main/java'
 ```
 
@@ -46,7 +46,7 @@ First, you will need to instruct BouncyCastle and Java to increate the limit for
 
 For a PQC signature algorithm, you just need to create an instance of it (implementing `SigAlgAPI`) and pass it to an instance of `InjectableAlgorithms` by invoking `withSigAlg`:
 
-```
+```java
 InjectableSphincsPlus mySphincs = new InjectableSphincsPlus();
 InjectableAlgorithms algs = new InjectableAlgorithms()
                 .withSigAlg(
@@ -62,7 +62,7 @@ InjectableAlgorithms algs = new InjectableAlgorithms()
 
 Finally, `push()` the injectable algorithms into the TLS `InjectionPoint`.
 
-```
+```java
 InjectionPoint.theInstance().push(algs);
 ```
 
@@ -94,6 +94,6 @@ algs = algs.withoutDefaultKEMs();
 
 Finally, `push()` the injectable algorithms into the TLS `InjectionPoint`.
 
-```
+```java
 InjectionPoint.theInstance().push(algs);
 ```
