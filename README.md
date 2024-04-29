@@ -97,3 +97,44 @@ Finally, `push()` the injectable algorithms into the TLS `InjectionPoint`.
 ```java
 InjectionPoint.theInstance().push(algs);
 ```
+
+## Using LibOQS
+
+You will need to obtain the `liboqs` and `liboqs-jni` native libraries. The sample gradle script for downloading them for Ubuntu is:
+
+```groovy
+plugins {
+    id "de.undercouch.download" version "5.6.0"
+}
+
+...
+
+        download.run {
+            src ([
+                    "https://qkd.lumii.lv/liboqs-binaries/Linux-x86_64/liboqs.so",
+                    "https://qkd.lumii.lv/liboqs-binaries/Linux-x86_64/liboqs-jni.so"
+            ])
+            dest "lib"
+            overwrite true
+        }
+        exec {
+            workingDir 'lib'
+            commandLine '/usr/bin/bash', '-c', 'chmod +x *.so'
+        }
+```
+
+Then, use the `InjectableLiboqsKEM` class:
+
+```java
+import lv.lumii.pqc.InjectableLiboqsKEM;
+
+...
+
+InjectableAlgorithms algs = new InjectableAlgorithms()
+                .withKEM(
+                    "FrodoKEM-640-AES", // algorithm name
+                    0x0200, // TLS code point for negotiating a KEM               
+                    ()->new InjectableLiboqsKEM("FrodoKEM-640-AES", 0x0200),
+                    InjectableKEMs.Ordering.BEFORE);
+```
+

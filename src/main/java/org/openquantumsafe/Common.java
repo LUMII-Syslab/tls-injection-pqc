@@ -1,13 +1,11 @@
 package org.openquantumsafe;
 
+import lv.lumii.qrng.QrngClient;
+
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
-import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 
 public class Common {
@@ -30,24 +28,36 @@ public class Common {
         return OS.contains("nux");
     }
 
-    public static void loadNativeLibrary() {
+    private static void addMainDirectoryToJavaLibraryPath() {
+        File f = new File(QrngClient.class.getProtectionDomain().getCodeSource().getLocation().getPath());
+        String mainExecutable = f.getAbsolutePath();
+        String mainDirectory = f.getParent();
 
-        System.loadLibrary("oqs");
-        // ^^^ load liboqs manually from java.library.path;
-        // oqs-jni depends on it but sometimes is not able to load it on MacOS
-        // change by SK
+        // Fix for debug purposes (when the code has been launched from the IDE):
+        if (mainExecutable.replace('\\', '/').endsWith("/build/classes/java/main")) {
+            mainDirectory = mainExecutable.substring(0, mainExecutable.length() - "/build/classes/java/main".length());
+            mainExecutable = "java";
+        }
 
+        System.setProperty("java.library.path",
+                mainDirectory+File.separator+"lib"+File.pathSeparator+
+                        mainDirectory+File.pathSeparator+
+                        System.getProperty("java.library.path"));
+        System.out.println(System.getProperty("java.library.path"));
+    }
+
+    private static void tryToLoadLibrary(String name) {
         try {
-            System.loadLibrary("oqs-jni");
-        // Otherwise load the library from the liboqs-java.jar
+            System.loadLibrary(name);
+            // Otherwise load the library from the liboqs-java.jar
         } catch (UnsatisfiedLinkError e) {
-            String libName = "liboqs-jni.so";
+            String libName = name+".so";
             if (Common.isLinux()) {
-                libName = "liboqs-jni.so";
+                libName = "lib"+name+".so";
             } else if (Common.isMac()) {
-                libName = "liboqs-jni.jnilib";
+                libName = "lib"+name+".jnilib";
             } else if (Common.isWindows()) {
-                libName = "oqs-jni.dll";
+                libName = name+".dll";
             }
             URL url = KEMs.class.getResource("/" + libName);
             if (url == null) {
@@ -80,6 +90,16 @@ public class Common {
                 exception.printStackTrace();
             }
         }
+    }
+
+    public static void loadNativeLibrary() {
+        addMainDirectoryToJavaLibraryPath();
+
+        tryToLoadLibrary("oqs");
+        // oqs-jni depends on liboqs but sometimes is not able to load it on MacOS
+
+        tryToLoadLibrary("oqs-jni");
+
     }
 
     public static <E, T extends Iterable<E>> void print_list(T list) {
