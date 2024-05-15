@@ -1,7 +1,5 @@
 package org.openquantumsafe;
 
-import lv.lumii.qrng.QrngClient;
-
 import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
@@ -29,7 +27,7 @@ public class Common {
     }
 
     private static void addMainDirectoryToJavaLibraryPath() {
-        File f = new File(QrngClient.class.getProtectionDomain().getCodeSource().getLocation().getPath());
+        File f = new File(Common.class.getProtectionDomain().getCodeSource().getLocation().getPath());
         String mainExecutable = f.getAbsolutePath();
         String mainDirectory = f.getParent();
 
@@ -43,7 +41,7 @@ public class Common {
                 mainDirectory+File.separator+"lib"+File.pathSeparator+
                         mainDirectory+File.pathSeparator+
                         System.getProperty("java.library.path"));
-        System.out.println(System.getProperty("java.library.path"));
+
     }
 
     private static void tryToLoadLibrary(String name) {
@@ -55,40 +53,46 @@ public class Common {
             if (Common.isLinux()) {
                 libName = "lib"+name+".so";
             } else if (Common.isMac()) {
-                libName = "lib"+name+".jnilib";
+                libName = "lib"+name+".dylib";//".jnilib";
             } else if (Common.isWindows()) {
                 libName = name+".dll";
             }
             URL url = KEMs.class.getResource("/" + libName);
-            if (url == null) {
-                String[] paths = System.getProperty("java.library.path").split(File.pathSeparator);
-                for (String path : paths) {
-                    File f = new File(path+File.separator+libName);
-                    if (f.isFile()) {
-                        try {
-                            url = f.toURI().toURL();
-                            System.load(url.getFile()); // load from full file name
-                            return;
-                        } catch (Throwable exception) {
-                            exception.printStackTrace();
-                        }
+            if (url != null) {
+                // try to load from Jar
+                File tmpDir;
+                try {
+                    tmpDir = Files.createTempDirectory("oqs-native-lib").toFile();
+                    tmpDir.deleteOnExit();
+                    File nativeLibTmpFile = new File(tmpDir, libName);
+                    nativeLibTmpFile.deleteOnExit();
+                    InputStream in = url.openStream();
+                    Files.copy(in, nativeLibTmpFile.toPath());
+                    System.load(nativeLibTmpFile.getAbsolutePath());
+                    return; // all ok
+                } catch (Exception exception) {
+                    exception.printStackTrace();
+                }
+            }
+
+            // try to load from java.library.path
+            String[] paths = System.getProperty("java.library.path").split(File.pathSeparator);
+            for (String path : paths) {
+                File f = new File(path+File.separator+libName);
+                if (f.isFile()) {
+                    try {
+                        url = f.toURI().toURL();
+                        System.load(url.getFile()); // load from full file name
+                        return;
+                    } catch (Throwable exception) {
                     }
                 }
             }
 
-            // try to load from Jar
-            File tmpDir;
-            try {
-                tmpDir = Files.createTempDirectory("oqs-native-lib").toFile();
-                tmpDir.deleteOnExit();
-                File nativeLibTmpFile = new File(tmpDir, libName);
-                nativeLibTmpFile.deleteOnExit();
-                InputStream in = url.openStream();
-                Files.copy(in, nativeLibTmpFile.toPath());
-                System.load(nativeLibTmpFile.getAbsolutePath());
-            } catch (Exception exception) {
-                exception.printStackTrace();
-            }
+            throw new RuntimeException("Could not find "+libName+" in java.library.path or in the project or jar directory.");
+            // e.g., download from:
+            // https://qkd.lumii.lv/liboqs-binaries/Darwin-x86_64/liboqs.dylib
+            // https://qkd.lumii.lv/liboqs-binaries/Darwin-x86_64/liboqs-jni.dylib
         }
     }
 
