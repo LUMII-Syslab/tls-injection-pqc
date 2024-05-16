@@ -5,10 +5,11 @@ import java.security.PublicKey;
 public class LiboqsPublicKey implements PublicKey
 {
     private String name;
-    private byte[] encoded;
-    public LiboqsPublicKey(String name, byte[] encoded) {
+    private byte[] pk, pkEncoded;
+    public LiboqsPublicKey(String name, byte[] pk, byte[] pkEncoded) {
         this.name = name;
-        this.encoded = encoded;
+        this.pk = pk;
+        this.pkEncoded = pkEncoded;
     }
     @Override
     public String getAlgorithm()
@@ -22,9 +23,13 @@ public class LiboqsPublicKey implements PublicKey
         return "X.509";
     }
 
+    public byte[] pk() {
+        return this.pk;
+    }
+
     @Override
     public byte[] getEncoded()
     {
-        return this.encoded;
+        return this.pkEncoded;
     }
 }

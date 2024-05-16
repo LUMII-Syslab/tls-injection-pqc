@@ -1,7 +1,7 @@
 Integration of PQC algorithms into the BouncyCastle TLS Injection Mechanism (TLS-IM)
 MIT License
 
-Copyright (c) 2022-2024 Institute of Mathematics and Computer Science, University of Latvia
+Copyright (c) 2022-2024 Sergejs Kozlovics and Institute of Mathematics and Computer Science, University of Latvia
 The main contributor: Sergejs Kozlovics
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

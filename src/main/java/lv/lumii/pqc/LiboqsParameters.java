@@ -5,12 +5,22 @@ import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 public class LiboqsParameters
         extends AsymmetricKeyParameter
 {
-    private byte[] pkEnc, skEnc;
-    public LiboqsParameters(boolean privateKey, byte[] pkEnc, byte[] skEnc)
+    private byte[] pk, pkEnc, sk, skEnc;
+    public LiboqsParameters(boolean privateKey, byte[] pk, byte[] pkEnc, byte[] sk, byte[] skEnc)
     {
         super(privateKey);
+        this.pk = pk;
         this.pkEnc = pkEnc;
+        this.sk = sk;
         this.skEnc = skEnc;
+    }
+
+    public byte[] pk() {
+        return this.pk;
+    }
+
+    public byte[] sk() {
+        return this.sk;
     }
 
     public byte[] pkEncoded() {

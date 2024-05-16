@@ -243,6 +243,20 @@ public class Signature {
         alg_details_.printSignature();
     }
 
+    public long public_key_length() {
+        if (alg_details_ == null) {
+            alg_details_ = get_sig_details();
+        }
+        return alg_details_.length_public_key;
+    }
+
+    public long secret_key_length() {
+        if (alg_details_ == null) {
+            alg_details_ = get_sig_details();
+        }
+        return alg_details_.length_secret_key;
+    }
+
     public static class Mutable<T> {
         T value;
         public void setValue(T t) { this.value = t; }

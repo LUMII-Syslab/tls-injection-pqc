@@ -1,9 +1,6 @@
 package lv.lumii.pqc;
 
-import org.bouncycastle.asn1.ASN1ObjectIdentifier;
-import org.bouncycastle.asn1.ASN1OctetString;
-import org.bouncycastle.asn1.ASN1Set;
-import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.asn1.*;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
@@ -60,8 +57,7 @@ public class InjectableLiboqsSigAlg
     }
 
     @Override
-    public boolean isSupportedAlgorithm(ASN1ObjectIdentifier oid)
-    {
+    public boolean isSupportedAlgorithm(ASN1ObjectIdentifier oid) {
         return this.oid.equals(oid);
     }
 
@@ -71,22 +67,30 @@ public class InjectableLiboqsSigAlg
     }
 
     @Override
-    public boolean isSupportedPublicKey(Key key)
-    {
+    public boolean isSupportedPublicKey(Key key) {
         return key instanceof LiboqsPublicKey;
     }
 
     @Override
-    public boolean isSupportedPrivateKey(Key key)
-    {
+    public boolean isSupportedPrivateKey(Key key) {
         return key instanceof LiboqsPrivateKey;
     }
 
     @Override
     public AsymmetricKeyParameter createPrivateKeyParameter(PrivateKeyInfo keyInfo) throws IOException {
-        byte[] skEnc = ASN1OctetString.getInstance(keyInfo.parsePrivateKey()).getOctets();
-        byte[] pkEnc = ASN1OctetString.getInstance(keyInfo.parsePublicKey()).getOctets();
-        return new LiboqsParameters(true, pkEnc, skEnc);
+        int len = keyInfo.getPrivateKey().getOctetsLength();
+        byte[] sk = keyInfo.getPrivateKey().getOctets();
+        byte[] skEnc = keyInfo.getPrivateKey().getEncoded();
+        //byte[] skEnc = ASN1OctetString.getInstance(keyInfo.parsePrivateKey()).getOctets();
+
+        byte[] pk = null;
+        byte[] pkEnc = null;
+        if (keyInfo.hasPublicKey()) {
+            pk = keyInfo.getPublicKeyData().getOctets();
+            pkEnc = keyInfo.getPublicKeyData().getEncoded();
+            //pkEnc = ASN1OctetString.getInstance(keyInfo.parsePublicKey()).getOctets();
+        }
+        return new LiboqsParameters(true, pk, pkEnc, sk, skEnc);
     }
 
     @Override
@@ -102,10 +106,11 @@ public class InjectableLiboqsSigAlg
     public AsymmetricKeyParameter createPublicKeyParameter(SubjectPublicKeyInfo keyInfo, Object defaultParams) throws IOException {
         byte[] wrapped = keyInfo.getEncoded(); // ASN1 wrapped
         SubjectPublicKeyInfo info = SubjectPublicKeyInfo.getInstance(wrapped);
-        byte[] pkEnc = info.getPublicKeyData().getBytes();
+        byte[] pk = info.getPublicKeyData().getOctets();
+        byte[] pkEnc = info.getPublicKeyData().getEncoded();
 
         //AlgorithmIdentifier alg = keyInfo.getAlgorithm(); ??
-        return new LiboqsParameters(false, pkEnc, null);
+        return new LiboqsParameters(false, pk, pkEnc, null, null);
     }
 
     @Override
@@ -116,7 +121,7 @@ public class InjectableLiboqsSigAlg
 
         // remove the first 4 bytes (alg. params)
         //if (encoding.length == sphincsPlusPKLength+4)
-          //  encoding = Arrays.copyOfRange(encoding, 4, encoding.length);
+        //  encoding = Arrays.copyOfRange(encoding, 4, encoding.length);
 
         AlgorithmIdentifier algorithmIdentifier = new AlgorithmIdentifier(oid);//??? -- does not matter
         // new AlgorithmIdentifier(Utils.sphincsPlusOidLookup(params.getParameters())); // by SK: here BC gets its algID!!!
@@ -126,32 +131,54 @@ public class InjectableLiboqsSigAlg
     @Override
     public PrivateKey generatePrivate(PrivateKeyInfo keyInfo) throws IOException {
 
+        int len = keyInfo.getPrivateKey().getOctetsLength();
         byte[] sk = keyInfo.getPrivateKey().getOctets();
-        byte[] pk = keyInfo.getPublicKeyData().getOctets();
+        byte[] skEncoded = keyInfo.getEncoded();
 
-        return new LiboqsPrivateKey(name, pk, sk);
+        byte[] pk = null;
+        byte[] pkEncoded = null;
+        ASN1BitString pubData = keyInfo.getPublicKeyData();
+        if (pubData != null) {
+            pk = pubData.getOctets();
+            pkEncoded = pubData.getEncoded();
+        }
+
+        return new LiboqsPrivateKey(name, pk, pkEncoded, sk, skEncoded);
     }
 
     @Override
     public PublicKey generatePublic(SubjectPublicKeyInfo keyInfo) throws IOException {
         byte[] pk = keyInfo.getPublicKeyData().getOctets();
-        return new LiboqsPublicKey(name, pk);
+        byte[] pkEncoded = keyInfo.getPublicKeyData().getEncoded();
+
+        return new LiboqsPublicKey(name, pk, pkEncoded);
     }
 
     @Override
     public byte[] internalEncodingFor(PublicKey key) {
-        return key.getEncoded();
+        if (key instanceof LiboqsPublicKey)
+            return ((LiboqsPublicKey) key).pk();
+        else
+            throw new RuntimeException("Not a LiboqsPublicKey given.");
     }
 
     @Override
-    public byte[] internalEncodingFor(PrivateKey key)
-    {
-        return key.getEncoded();
+    public byte[] internalEncodingFor(PrivateKey key) {
+        if (key instanceof LiboqsPrivateKey)
+            return ((LiboqsPrivateKey) key).sk();
+        else
+            throw new RuntimeException("Not a LiboqsPrivateKey given.");
     }
 
     @Override
     public byte[] sign(JcaTlsCrypto crypto, byte[] message, byte[] privateKey) throws IOException {
         Signature signer = new Signature(name, privateKey);
+
+        if (privateKey.length > signer.secret_key_length()) {
+            // for sphincs+ we have: 4 , 96, private key, public key
+            privateKey = Arrays.copyOfRange(privateKey, (int)privateKey.length-(int)signer.secret_key_length()-(int)signer.public_key_length(), (int)privateKey.length-(int)signer.public_key_length());
+            signer = new Signature(name, privateKey);
+        }
         byte[] signature = signer.sign(message);
         return signature;
     }
@@ -166,26 +193,28 @@ public class InjectableLiboqsSigAlg
     @Override
     public SignatureSpi signatureSpi(Key publicOrPrivateKey) {
         boolean nameMatches = name.equals(publicOrPrivateKey.getAlgorithm());
-        for (String alias: this.aliases)
+        for (String alias : this.aliases)
             nameMatches = nameMatches || alias.equals(publicOrPrivateKey.getAlgorithm());
 
-        if (nameMatches) {
-            publicOrPrivateKey = new LiboqsPublicKey(name, publicOrPrivateKey.getEncoded());
+        if (nameMatches && !(publicOrPrivateKey instanceof LiboqsPublicKey)) {
+            publicOrPrivateKey = new LiboqsPublicKey(name, null, publicOrPrivateKey.getEncoded());
         }
 
         if (publicOrPrivateKey instanceof LiboqsPublicKey) {
             PublicKeyToCipherParameters f1 = (pk) -> {
-                if (name.equals(pk.getAlgorithm())) {
-                    byte[] b = pk.getEncoded();
-                    return new LiboqsParameters(false, b, null);
-                }
-                else
-                    throw new RuntimeException("The given public key does not correspond to the supported algorithm "+name);
+                // if (name.equals(pk.getAlgorithm()))...
+                if (pk instanceof LiboqsPublicKey) {
+                    return new LiboqsParameters(false,
+                            ((LiboqsPublicKey) pk).pk(), ((LiboqsPublicKey) pk).getEncoded(), null, null);
+                } else
+                    throw new RuntimeException("Not a LiboqsPublicKey given.");
 
             };
             PrivateKeyToCipherParameters f2 = (sk) -> {
                 if (sk instanceof LiboqsPrivateKey)
-                    return new LiboqsParameters(true, ((LiboqsPrivateKey)sk).pkEncoded(), ((LiboqsPrivateKey)sk).skEncoded());
+                    return new LiboqsParameters(true,
+                            ((LiboqsPrivateKey) sk).pk(), ((LiboqsPrivateKey) sk).pkEncoded(),
+                            ((LiboqsPrivateKey) sk).sk(), ((LiboqsPrivateKey) sk).skEncoded());
                 else
                     throw new RuntimeException("Not a LiboqsPrivateKey given.");
             };
@@ -198,12 +227,12 @@ public class InjectableLiboqsSigAlg
                             (params) -> {
                                 assert params instanceof LiboqsParameters;
                                 LiboqsParameters pkParams = (LiboqsParameters) params;
-                                return pkParams.pkEncoded();
+                                return pkParams.pk();
                             },
                             (params) -> {
                                 assert params instanceof LiboqsParameters;
                                 LiboqsParameters skParams = (LiboqsParameters) params;
-                                return skParams.skEncoded();
+                                return skParams.sk();
                             }),
                     f1, f2);
 
