@@ -36,7 +36,7 @@ Second, clone this repository, e.g., into `src/tls-injection-pqc`. Then add the 
 
 ## Increasing TLS Handshake Message Size
 
-First, you will need to instruct BouncyCastle and Java to increate the limit for the TLS handshake message due to the fact that PQC signatures are huge (and they are transmitted during the handshake).
+First, you will need to instruct BouncyCastle and Java to increase the limit for the TLS handshake message due to the fact that PQC signatures are huge (and they are transmitted during the handshake).
 
 ```java
  System.setProperty("jdk.tls.maxHandshakeMessageSize", String.valueOf(32768 * 32));
