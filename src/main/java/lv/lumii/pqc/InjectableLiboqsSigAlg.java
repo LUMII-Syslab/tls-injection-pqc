@@ -175,7 +175,7 @@ public class InjectableLiboqsSigAlg
         Signature signer = new Signature(name, privateKey);
 
         if (privateKey.length > signer.secret_key_length()) {
-            // for sphincs+ we have: 4 , 96, private key, public key
+            // liboqs stores private keys as follows: 4 (ASN octet string), <len>, private key, public key
             privateKey = Arrays.copyOfRange(privateKey, (int)privateKey.length-(int)signer.secret_key_length()-(int)signer.public_key_length(), (int)privateKey.length-(int)signer.public_key_length());
             signer = new Signature(name, privateKey);
         }
