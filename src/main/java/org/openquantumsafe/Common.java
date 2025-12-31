@@ -78,13 +78,16 @@ public class Common {
             // try to load from java.library.path
             String[] paths = System.getProperty("java.library.path").split(File.pathSeparator);
             for (String path : paths) {
+                System.out.println("PATH "+path);
                 File f = new File(path+File.separator+libName);
                 if (f.isFile()) {
                     try {
                         url = f.toURI().toURL();
+                        System.out.println("LOAD... "+url.getFile());
                         System.load(url.getFile()); // load from full file name
                         return;
                     } catch (Throwable exception) {
+                        exception.printStackTrace();
                     }
                 }
             }

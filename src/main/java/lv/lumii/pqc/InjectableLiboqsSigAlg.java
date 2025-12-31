@@ -174,9 +174,11 @@ public class InjectableLiboqsSigAlg
     public byte[] sign(JcaTlsCrypto crypto, byte[] message, byte[] privateKey) throws IOException {
         Signature signer = new Signature(name, privateKey);
 
-        if (privateKey.length > signer.secret_key_length()) {
+        int skLen = signer.export_secret_key().length;
+        int pkLen = signer.export_public_key().length;
+        if (privateKey.length > skLen) {
             // liboqs stores private keys as follows: 4 (ASN octet string), <len>, private key, public key
-            privateKey = Arrays.copyOfRange(privateKey, (int)privateKey.length-(int)signer.secret_key_length()-(int)signer.public_key_length(), (int)privateKey.length-(int)signer.public_key_length());
+            privateKey = Arrays.copyOfRange(privateKey, privateKey.length-skLen-pkLen, privateKey.length-pkLen);
             signer = new Signature(name, privateKey);
         }
         byte[] signature = signer.sign(message);
